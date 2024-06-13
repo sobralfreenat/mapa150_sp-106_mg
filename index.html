@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mapa de Cidades Priorizadas</title>
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <style>
+        body { margin: 0; padding: 0; font-family: Arial, sans-serif; position: relative; }
+        #map { height: 58vh; width: 100%; }
+        .destacado { background-color: #ffa500; }
+        .legend { background-color: #fff; padding: 15px; border-radius: 5px; position: relative; bottom: 5%; left: 0%; z-index: 1000; font-size: 11px; line-height: 1.5; box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.2); }
+        .legend div { margin-bottom: 2px; }
+        #controles {  width: 640px; position: absolute; top: 18vh; left: 109%; background-color: #fff; padding: 15px; border-radius: 5px; box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.2); z-index: 1000; font-size: 14px; line-height: 1.5; }
+        h5 { margin-top: 0; margin-bottom: 10px; }
+        label { display: block; margin-bottom: 5px; }
+        select, input[type="text"] { width: 60%; padding: 5px; margin-bottom: 10px; }
+        button { background-color: #D1D7D7; color: #D7D7D7; border: none; padding: 8px 15px; margin-right: 10px; border-radius: 5px; cursor: pointer; }
+        button:hover { background-color: #ffffff; }
+        #busca-input { width: 100%; padding: 5px; }
+
+         /* Estilização básica para o elemento visual */
+    .overlay {
+      position: absolute;
+      width: 200px;
+      height: 200px;
+      background-color: rgba(255, 0, 191, 0.082); /* Cor de fundo semi-transparente */
+      pointer-events: auto; /* Habilitar eventos de mouse no elemento */
+    }
+
+    #overlay {
+  position: absolute;
+  left: 220px; /* Ajuste a posição inicial à sua preferência */
+  top: 50px; /* Ajuste a posição inicial à sua preferência */
+  width: 200px;
+  height: 200px;
+  background-color: rgba(73, 0, 55, 0.068); /* Transparência de 80% */
+  border-radius: 50%; /* Deixa o elemento redondo */
+  cursor: grab; /* Mostra um cursor de mão fechada para indicar arraste */
+  z-index: 1000; /* Certifica-se de que o elemento esteja acima do mapa */
+}
+  </style>
+
+</head>
+<body>
+    <div id='map'></div>
+
+    <div id='overlay'></div>
+
+
+    <div class="legend">
+        <p><b> </b></p>
+        <div><span style="background-color: #000; width: 15px; height: 15px; display: inline-block;"></span> check</div>
+        
+    </div>
+
+    <div class="overlay" id="overlay"></div>
+
+    <div id='controles'>
+        <h4>Controles</h4>
+        <label for="estado-select">Selecione um estado:</label>
+        <select id="estado-select" onchange="carregarCidades()">
+            <option value="">-- Escolha um estado --</option>
+            <option value="MG">Minas Gerais (106)</option>
+            <option value="MT">Mato Grosso (0)</option>
+            <option value="MS">Mato Grosso do Sul (0)</option>
+            <option value="SP">São Paulo (150)</option>
+            <!-- Adicione mais estados conforme necessário -->
+        </select>
+
+        <label for="filtro-cidade">Selecione uma cidade:</label>
+        <select id="filtro-cidade" onchange="filtrarCidadesPorNome()">
+            <option value="todos">Todas</option>
+        </select>
+
+        <label for="filtro-potencial">Filtrar por potencial comercial:</label>
+<select id="filtro-potencial" onchange="filtrarCidades();">
+    <option value="todos">Todos</option>
+    <option value="baixo">Potencial Comercial Baixo</option>
+    <option value="medio-baixo">Potencial Comercial Médio-Baixo</option>
+    <option value="medio">Potencial Comercial Médio</option>
+    <option value="medio-alto">Potencial Comercial Médio-Alto</option>
+    <option value="alto">Potencial Comercial Alto</option>
+</select>
+
+
+
+
+        <button id="adicionar-marcador-btn" onclick="adicionarMarcador()" disabled >Adicionar Marcador</button>
+        <button onclick="salvarMapa()" disabled="" >Salvar Mapa</button>
+        <button onclick="carregarMapa()" disabled >Carregar Mapa</button>
+        <button onclick="limparMarcadores()">Limpar Marcadores</button>
+        <br>
+        <label for="busca-input">Buscar cidade:</label>
+        <input type="text" id="busca-input" oninput="filtrarOpcoes()" placeholder="Digite o nome da cidade">
+    </div>
+
+    
+<script>
+
+
+
+     
+    
+        // ... (mantenha o restante do código igual)
+      const map = L.map('map').setView([-18.5122, -44.5550], 7);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        const citiesData = [
+
+
+        
+        
+    // ... (outras cidades já adicionadas)
+    { name: 'São Paulo SP', coords: [-23.5505, -46.6333], population: 11451245, businessPotential: 'Alto' },
+    { name: 'Guarulhos SP', coords: [-23.4628, -46.5323], population: 1291784, businessPotential: 'Alto' },
+    { name: 'Campinas SP', coords: [-22.9068, -47.0616], population: 1138309, businessPotential: 'Alto' },
+    { name: 'São Bernardo do Campo SP', coords: [-23.6898, -46.5646], population: 810729, businessPotential: 'Alto' },
+
+    { name: 'Santo André SP', coords: [-23.6637, -46.5383], population: 748919, businessPotential: 'Alto' },
+    { name: 'Osasco SP', coords: [-23.5329, -46.7920], population: 743432, businessPotential: 'Alto' },
+    { name: 'Sorocaba SP', coords: [-23.5015, -47.4526], population: 723574, businessPotential: 'Alto' },
+    { name: 'Ribeirão Preto SP', coords: [-21.1775, -47.8103], population: 698259, businessPotential: 'Alto' },
+    { name: 'São José dos Campos SP', coords: [-23.1896, -45.8841], population: 697428, businessPotential: 'Alto' },
+    { name: 'São José do Rio Preto SP', coords: [-20.8113, -49.3758], population: 480439, businessPotential: 'Alto' },
+    { name: 'Mogi das Cruzes SP', coords: [-23.5206, -46.1854], population: 449955, businessPotential: 'Alto' },
+    { name: 'Jundiaí SP', coords: [-23.1857, -46.8978], population: 443116, businessPotential: 'Alto' },
+    { name: 'Piracicaba SP', coords: [-22.7343, -47.6481], population: 423323, businessPotential: 'Alto' },
+    { name: 'Santos SP', coords: [-23.9608, -46.3336], population: 418608, businessPotential: 'Alto' },
+    { name: 'Mauá SP', coords: [-23.6676, -46.4614], population: 418261, businessPotential: 'Alto' },
+
+    { name: 'Diadema SP', coords: [-23.6813, -46.6206], population: 393237, businessPotential: 'Alto' },
+    { name: 'Carapicuíba SP', coords: [-23.5225, -46.8358], population: 387121, businessPotential: 'Alto' },
+    { name: 'Bauru SP', coords: [-22.3146, -49.0606], population: 379146, businessPotential: 'Alto' },
+    { name: 'Itaquaquecetuba SP', coords: [-23.4869, -46.3483], population: 369275, businessPotential: 'Alto' },
+    { name: 'Franca SP', coords: [-20.5386, -47.4008], population: 352537, businessPotential: 'Alto' },
+
+    { name: 'São Vicente SP', coords: [-23.9578, -46.3883], population: 329844, businessPotential: 'Alto' },
+    { name: 'Barueri SP', coords: [-23.5100, -46.8761], population: 316473, businessPotential: 'Alto' },
+    { name: 'Taubaté SP', coords: [-23.0205, -45.5563], population: 310739, businessPotential: 'Alto' },
+    { name: 'Suzano SP', coords: [-23.5425, -46.3108], population: 307364, businessPotential: 'Alto' },
+    { name: 'Limeira SP', coords: [-22.5643, -47.4018], population: 291869, businessPotential: 'Alto' },
+    { name: 'Guarujá SP', coords: [-23.9931, -46.2563], population: 287634, businessPotential: 'Alto' },
+    { name: 'Sumaré SP', coords: [-22.8204, -47.2727], population: 279546, businessPotential: 'Alto' },
+    { name: 'Cotia SP', coords: [-23.6022, -46.9195], population: 273640, businessPotential: 'Alto' },
+    { name: 'Taboão da Serra SP', coords: [-23.6261, -46.7912], population: 273542, businessPotential: 'Alto' },
+    { name: 'Indaiatuba SP', coords: [-23.0825, -47.2115], population: 255739, businessPotential: 'Alto' },
+    
+    { name: 'São Carlos SP', coords: [-22.0056, -47.8977], population: 254822, businessPotential: 'Alto' },
+    { name: 'Embu das Artes SP', coords: [-23.6437, -46.8579], population: 250720, businessPotential: 'Alto' },
+    { name: 'Araraquara SP', coords: [-21.7943, -48.1759], population: 242228, businessPotential: 'Alto' },
+    { name: 'Jacareí SP', coords: [-23.3056, -45.9658], population: 240275, businessPotential: 'Alto' },
+    { name: 'Marília SP', coords: [-22.2136, -49.9458], population: 237629, businessPotential: 'Alto' },
+    { name: 'Americana SP', coords: [-22.7399, -47.3315], population: 237247, businessPotential: 'Alto' },
+    { name: 'Hortolândia SP', coords: [-22.8583, -47.2200], population: 236641, businessPotential: 'Alto' },
+    { name: 'Itapevi SP', coords: [-23.5488, -46.9321], population: 232513, businessPotential: 'Alto' },
+    { name: 'Presidente Prudente SP', coords: [-22.1207, -51.3925], population: 225668, businessPotential: 'Alto' },
+    { name: 'Rio Claro SP', coords: [-22.4116, -47.5614], population: 201418, businessPotential: 'Alto' },
+    { name: 'Araçatuba SP', coords: [-21.2076, -50.4401], population: 200124, businessPotential: 'Alto' },
+    { name: 'Santa Bárbara d\'Oeste SP', coords: [-22.7553, -47.4143], population: 183347, businessPotential: 'Médio-Alto' },
+
+    { name: 'Ferraz de Vasconcelos SP', coords: [-23.5408, -46.3688], population: 179205, businessPotential: 'Médio-Alto' },
+    { name: 'Bragança Paulista SP', coords: [-22.9519, -46.5419], population: 176811, businessPotential: 'Médio-Alto' },
+    { name: 'Itu SP', coords: [-23.2675, -47.2991], population: 168240, businessPotential: 'Médio-Alto' },
+    { name: 'São Caetano do Sul SP', coords: [-23.6231, -46.5513], population: 165655, businessPotential: 'Médio-Alto' },
+    { name: 'Pindamonhangaba SP', coords: [-22.9246, -45.4615], population: 165428, businessPotential: 'Médio-Alto' },
+    { name: 'Francisco Morato SP', coords: [-23.2815, -46.7452], population: 165139, businessPotential: 'Médio-Alto' },
+    { name: 'Atibaia SP', coords: [-23.1176, -46.5565], population: 158640, businessPotential: 'Médio-Alto' },
+    { name: 'Itapecerica da Serra SP', coords: [-23.7165, -46.8579], population: 158522, businessPotential: 'Médio-Alto' },
+    { name: 'Itapetininga SP', coords: [-23.5887, -48.0483], population: 157790, businessPotential: 'Médio-Alto' },
+    { name: 'Santana de Parnaíba SP', coords: [-23.4439, -46.9178], population: 154105, businessPotential: 'Médio-Alto' },
+    { name: 'Mogi Guaçu SP', coords: [-22.3675, -46.9428], population: 153661, businessPotential: 'Médio-Alto' },
+    { name: 'Botucatu SP', coords: [-22.8837, -48.4437], population: 145155, businessPotential: 'Médio' },
+
+    { name: 'Franco da Rocha SP', coords: [-23.3211, -46.7272], population: 144849, businessPotential: 'Médio' },
+    { name: 'Caraguatatuba SP', coords: [-23.6225, -45.4131], population: 134875, businessPotential: 'Médio' },
+    { name: 'Salto SP', coords: [-23.1996, -47.2931], population: 134319, businessPotential: 'Médio' },
+    { name: 'Jaú SP', coords: [-22.2936, -48.5595], population: 133497, businessPotential: 'Médio' },
+    { name: 'Araras SP', coords: [-22.3569, -47.3849], population: 130866, businessPotential: 'Médio' },
+    { name: 'Votorantim SP', coords: [-23.5417, -47.4376], population: 127923, businessPotential: 'Médio' },
+    { name: 'Sertãozinho SP', coords: [-21.1314, -47.9873], population: 126887, businessPotential: 'Médio' },
+    { name: 'Valinhos SP', coords: [-22.9694, -46.9978], population: 126325, businessPotential: 'Médio' },
+    { name: 'Tatuí SP', coords: [-23.3487, -47.8461], population: 123942, businessPotential: 'Médio' },
+    { name: 'Barretos SP', coords: [-20.5576, -48.5674], population: 122485, businessPotential: 'Médio' },
+    { name: 'Itatiba SP', coords: [-23.0035, -46.8468], population: 122424, businessPotential: 'Médio' },
+    { name: 'Birigui SP', coords: [-21.2910, -50.3432], population: 118979, businessPotential: 'Médio' },
+    { name: 'Jandira SP', coords: [-23.5275, -46.9025], population: 118045, businessPotential: 'Médio' },
+    { name: 'Guaratinguetá SP', coords: [-22.8075, -45.1935], population: 118044, businessPotential: 'Médio' },
+    { name: 'Catanduva SP', coords: [-21.1312, -48.9778], population: 115785, businessPotential: 'Médio' },
+
+    { name: 'Várzea Paulista SP', coords: [-23.2115, -46.8282], population: 115771, businessPotential: 'Médio' },
+    { name: 'Ribeirão Pires SP', coords: [-23.7063, -46.4063], population: 115559, businessPotential: 'Médio' },
+    { name: 'Itanhaém SP', coords: [-24.1736, -46.7889], population: 112476, businessPotential: 'Médio' },
+    { name: 'Cubatão SP', coords: [-23.895, -46.4253], population: 112471, businessPotential: 'Médio' },
+    { name: 'Paulínia SP', coords: [-22.7639, -47.1488], population: 110537, businessPotential: 'Médio' },
+    { name: 'Ourinhos SP', coords: [-22.9797, -49.8706], population: 103970, businessPotential: 'Médio' },
+    { name: 'Poá SP', coords: [-23.5333, -46.3473], population: 103765, businessPotential: 'Médio' },
+    { name: 'Assis SP', coords: [-22.66, -50.4183], population: 101409, businessPotential: 'Médio' },
+    { name: 'Leme SP', coords: [-22.1864, -47.3925], population: 98145, businessPotential: 'Médio-Baixo' },
+    { name: 'Votuporanga SP', coords: [-20.4237, -49.9781], population: 96634, businessPotential: 'Médio-Baixo' },
+    { name: 'Caçapava SP', coords: [-23.0992, -45.7076], population: 96202, businessPotential: 'Médio-Baixo' },
+    { name: 'Caieiras SP', coords: [-23.3605, -46.7408], population: 95030, businessPotential: 'Médio-Baixo' },
+
+    { name: 'Mairiporã SP', coords: [-23.3171, -46.5897], population: 93617, businessPotential: 'Médio-Baixo' },
+    { name: 'Ubatuba SP', coords: [-23.4336, -45.0838], population: 92980, businessPotential: 'Médio-Baixo' },
+    { name: 'Avaré SP', coords: [-23.1045, -48.9258], population: 92805, businessPotential: 'Médio-Baixo' },
+    { name: 'Cajamar SP', coords: [-23.355, -46.8781], population: 92689, businessPotential: 'Médio-Baixo' },
+    { name: 'Mogi Mirim SP', coords: [-22.4319, -46.9532], population: 92559, businessPotential: 'Médio-Baixo' },
+    { name: 'São João da Boa Vista SP', coords: [-21.9707, -46.7944], population: 92535, businessPotential: 'Médio-Baixo' },
+    { name: 'Itapeva SP', coords: [-23.9788, -48.8764], population: 89728, businessPotential: 'Médio-Baixo' },
+    { name: 'Arujá SP', coords: [-23.3965, -46.319], population: 86678, businessPotential: 'Médio-Baixo' },
+    { name: 'Lorena SP', coords: [-22.7334, -45.1197], population: 84855, businessPotential: 'Médio-Baixo' },
+    { name: 'São Sebastião SP', coords: [-23.7955, -45.4143], population: 81540, businessPotential: 'Médio-Baixo' },
+    { name: 'São Roque SP', coords: [-23.5226, -47.1357], population: 79484, businessPotential: 'Médio-Baixo' },
+
+    { name: 'Matão SP', coords: [-21.6020, -48.3645], population: 79033, businessPotential: 'Médio-Baixo' },
+    { name: 'Campo Limpo Paulista SP', coords: [-23.2078, -46.7839], population: 77632, businessPotential: 'Médio-Baixo' },
+    { name: 'Vinhedo SP', coords: [-23.0297, -46.9753], population: 76663, businessPotential: 'Médio-Baixo' },
+    { name: 'Bebedouro SP', coords: [-20.9491, -48.4791], population: 76373, businessPotential: 'Médio-Baixo' },
+    { name: 'Cruzeiro SP', coords: [-22.5773, -44.9612], population: 74961, businessPotential: 'Médio-Baixo' },
+    { name: 'Ibiúna SP', coords: [-23.6596, -47.2231], population: 74957, businessPotential: 'Médio-Baixo' },
+    { name: 'Lins SP', coords: [-21.6718, -49.7526], population: 74779, businessPotential: 'Médio-Baixo' },
+    { name: 'Pirassununga SP', coords: [-22.0076, -47.8977], population: 73545, businessPotential: 'Médio-Baixo' },
+    { name: 'Itapira SP', coords: [-22.2305, -46.9488], population: 72022, businessPotential: 'Médio-Baixo' },
+    { name: 'Jaboticabal SP', coords: [-21.2520, -48.3252], population: 71821, businessPotential: 'Médio-Baixo' },
+    { name: 'Fernandópolis SP', coords: [-20.2806, -50.2471], population: 71186, businessPotential: 'Médio-Baixo' },
+    { name: 'Itupeva SP', coords: [-23.1526, -47.0593], population: 70616, businessPotential: 'Médio-Baixo' },
+
+    { name: 'Boituva SP', coords: [-23.2855, -47.6786], population: 61081, businessPotential: 'Médio-Baixo' },
+    { name: 'Ibitinga SP', coords: [-21.7565, -48.8319], population: 60037, businessPotential: 'Médio-Baixo' },
+    { name: 'Registro SP', coords: [-24.4879, -47.8438], population: 59946, businessPotential: 'Médio-Baixo' },
+    { name: 'Andradina SP', coords: [-20.8986, -51.3786], population: 59783, businessPotential: 'Médio-Baixo' },
+    { name: 'Cosmópolis SP', coords: [-22.6419, -47.1926], population: 59773, businessPotential: 'Médio-Baixo' },
+    { name: 'Jaguariúna SP', coords: [-22.7037, -46.9851], population: 59347, businessPotential: 'Médio-Baixo' },
+    { name: 'Batatais SP', coords: [-20.8929, -47.5921], population: 58402, businessPotential: 'Médio-Baixo' },
+    { name: 'Porto Feliz SP', coords: [-23.2115, -47.5251], population: 56497, businessPotential: 'Médio-Baixo' },
+    { name: 'Olímpia SP', coords: [-20.7366, -48.9101], population: 55075, businessPotential: 'Médio-Baixo' },
+    { name: 'Santa Isabel SP', coords: [-23.3153, -46.2237], population: 53174, businessPotential: 'Médio-Baixo' },
+    { name: 'Piedade SP', coords: [-23.7139, -47.4256], population: 52970, businessPotential: 'Médio-Baixo' },
+
+    { name: 'Porto Ferreira SP', coords: [-21.8498, -47.4876], population: 52649, businessPotential: 'Médio-Baixo' },
+    { name: 'Taquaritinga SP', coords: [-21.4049, -48.5103], population: 52260, businessPotential: 'Médio-Baixo' },
+    { name: 'São José do Rio Pardo SP', coords: [-21.5953, -46.8873], population: 52204, businessPotential: 'Médio-Baixo' },
+    { name: 'Louveira SP', coords: [-23.0856, -46.9484], population: 51833, businessPotential: 'Médio-Baixo' },
+    { name: 'Artur Nogueira SP', coords: [-22.5727, -47.1727], population: 51456, businessPotential: 'Médio-Baixo' },
+    { name: 'Tremembé SP', coords: [-22.9595, -45.5475], population: 51173, businessPotential: 'Médio-Baixo' },
+    { name: 'Vargem Grande Paulista SP', coords: [-23.5993, -47.0228], population: 50333, businessPotential: 'Médio-Baixo' },
+    { name: 'Capivari SP', coords: [-23.0118, -47.8977], population: 50068, businessPotential: 'Médio-Baixo' },
+
+    { name: 'Mairinque SP', coords: [-23.5395, -47.1850], population: 49972, businessPotential: 'Baixo' },
+    { name: 'Jales SP', coords: [-20.2671, -50.5495], population: 48776, businessPotential: 'Baixo' },
+    { name: 'São Joaquim da Barra SP', coords: [-20.5801, -47.8530], population: 48558, businessPotential: 'Baixo' },
+    { name: 'Monte Alto SP', coords: [-21.2655, -48.4971], population: 47574, businessPotential: 'Baixo' },
+    { name: 'Cabreúva SP', coords: [-23.3053, -47.1362], population: 47011, businessPotential: 'Baixo' },
+    { name: 'Campos do Jordão SP', coords: [-22.7383, -45.5923], population: 46974, businessPotential: 'Baixo' },
+    { name: 'Santa Cruz do Rio Pardo SP', coords: [-22.8988, -49.6355], population: 46442, businessPotential: 'Baixo' },
+    { name: 'Capão Bonito SP', coords: [-24.0113, -48.3482], population: 46337, businessPotential: 'Baixo' },
+    { name: 'Dracena SP', coords: [-21.4843, -51.5350], population: 45474, businessPotential: 'Baixo' },
+    { name: 'Jardinópolis SP', coords: [-21.0176, -47.7606], population: 45282, businessPotential: 'Baixo' },
+    { name: 'Pederneiras SP', coords: [-22.3511, -48.7781], population: 44827, businessPotential: 'Baixo' },
+    { name: 'Cerquilho SP', coords: [-23.1665, -47.7459], population: 44695, businessPotential: 'Baixo' },
+    { name: 'Itararé SP', coords: [-24.1085, -49.3352], population: 44438, businessPotential: 'Baixo' },
+    { name: 'Rio Grande da Serra SP', coords: [-23.7437, -46.3978], population: 44170, businessPotential: 'Baixo' },
+
+    { name: 'Belo Horizonte MG', coords: [-19.9167, -43.9345], population: 2315560, businessPotential: 'Alto' },
+{ name: 'Uberlândia MG', coords: [-18.9183, -48.2766], population: 713232, businessPotential: 'Alto' },
+{ name: 'Contagem MG', coords: [-19.9317, -44.0536], population: 621865, businessPotential: 'Alto' },
+{ name: 'Juiz de Fora MG', coords: [-21.7642, -43.3504], population: 540756, businessPotential: 'Alto' },
+{ name: 'Montes Claros MG', coords: [-16.7351, -43.8601], population: 414240, businessPotential: 'Alto' },
+{ name: 'Betim MG', coords: [-19.9677, -44.1986], population: 411859, businessPotential: 'Alto' },
+{ name: 'Uberaba MG', coords: [-19.7488, -47.9318], population: 337846, businessPotential: 'Alto' },
+{ name: 'Ribeirão das Neves MG', coords: [-19.7663, -44.0849], population: 329794, businessPotential: 'Alto' },
+{ name: 'Governador Valadares MG', coords: [-18.8543, -41.9559], population: 257172, businessPotential: 'Alto' },
+{ name: 'Divinópolis MG', coords: [-20.1393, -44.8913], population: 231091, businessPotential: 'Alto' },
+
+{ name: 'Ipatinga MG', coords: [-19.4703, -42.5475], population: 227731, businessPotential: 'Alto' },
+{ name: 'Sete Lagoas MG', coords: [-19.4566, -44.2412], population: 227360, businessPotential: 'Alto' },
+{ name: 'Santa Luzia MG', coords: [-19.7699, -43.8516], population: 218805, businessPotential: 'Alto' },
+{ name: 'Ibirité MG', coords: [-20.0256, -44.0561], population: 170387, businessPotential: 'Médio-Alto' },
+{ name: 'Poços de Caldas MG', coords: [-21.7876, -46.5613], population: 163742, businessPotential: 'Médio-Alto' },
+{ name: 'Patos de Minas MG', coords: [-18.5789, -46.5185], population: 159235, businessPotential: 'Médio-Alto' },
+{ name: 'Pouso Alegre MG', coords: [-22.2343, -45.9389], population: 152212, businessPotential: 'Médio-Alto' },
+{ name: 'Teófilo Otoni MG', coords: [-17.8573, -41.5026], population: 137418, businessPotential: 'Médio' },
+
+{ name: 'Varginha MG', coords: [-21.5515, -45.4343], population: 136467, businessPotential: 'Médio' },
+{ name: 'Conselheiro Lafaiete MG', coords: [-20.6632, -43.7851], population: 131621, businessPotential: 'Médio' },
+
+{ name: 'Sabará MG', coords: [-19.8842, -43.8261], population: 129372, businessPotential: 'Médio' },
+{ name: 'Vespasiano MG', coords: [-19.6918, -43.9234], population: 129246, businessPotential: 'Médio' },
+{ name: 'Barbacena MG', coords: [-21.2214, -43.7704], population: 125317, businessPotential: 'Médio' },
+{ name: 'Araguari MG', coords: [-18.6498, -48.1902], population: 117808, businessPotential: 'Médio' },
+{ name: 'Itabira MG', coords: [-19.6231, -43.2312], population: 113343, businessPotential: 'Médio' },
+{ name: 'Passos MG', coords: [-20.7155, -46.6083], population: 111939, businessPotential: 'Médio' },
+{ name: 'Nova Lima MG', coords: [-19.9893, -43.8462], population: 111697, businessPotential: 'Médio' },
+{ name: 'Araxá MG', coords: [-19.5902, -46.9434], population: 111691, businessPotential: 'Médio' },
+{ name: 'Nova Serrana MG', coords: [-19.8712, -44.9844], population: 105552, businessPotential: 'Médio' },
+{ name: 'Lavras MG', coords: [-21.2407, -45.0001], population: 104761, businessPotential: 'Médio' },
+{ name: 'Coronel Fabriciano MG', coords: [-19.5275, -42.6272], population: 104736, businessPotential: 'Médio' },
+{ name: 'Muriaé MG', coords: [-21.1313, -42.3697], population: 104108, businessPotential: 'Médio' },
+{ name: 'Ubá MG', coords: [-21.1198, -42.9355], population: 103365, businessPotential: 'Médio' },
+{ name: 'Ituiutaba MG', coords: [-18.9706, -49.4635], population: 102217, businessPotential: 'Médio' },
+
+{ name: 'Itaúna MG', coords: [-20.0759, -44.5783], population: 97669, businessPotential: 'Médio-Baixo' },
+{ name: 'Pará de Minas MG', coords: [-19.8538, -44.6117], population: 97139, businessPotential: 'Médio-Baixo' },
+{ name: 'Paracatu MG', coords: [-17.2236, -46.8711], population: 94017, businessPotential: 'Médio-Baixo' },
+{ name: 'Itajubá MG', coords: [-22.4221, -45.4595], population: 93073, businessPotential: 'Médio-Baixo' },
+{ name: 'Manhuaçu MG', coords: [-20.2570, -42.0359], population: 91886, businessPotential: 'Médio-Baixo' },
+{ name: 'São João del Rei MG', coords: [-21.1308, -44.2522], population: 90225, businessPotential: 'Médio-Baixo' },
+{ name: 'Patrocínio MG', coords: [-18.9436, -46.9925], population: 89826, businessPotential: 'Médio-Baixo' },
+{ name: 'Caratinga MG', coords: [-19.7922, -42.1299], population: 87360, businessPotential: 'Médio-Baixo' },
+{ name: 'Unaí MG', coords: [-16.3578, -46.9072], population: 86619, businessPotential: 'Médio-Baixo' },
+{ name: 'Esmeraldas MG', coords: [-19.7636, -44.3136], population: 85594, businessPotential: 'Médio-Baixo' },
+{ name: 'Timóteo MG', coords: [-19.5815, -42.6474], population: 81579, businessPotential: 'Médio-Baixo' },
+
+{ name: 'Curvelo MG', coords: [-18.7566, -44.4299], population: 80352, businessPotential: 'Médio-Baixo' },
+{ name: 'João Monlevade MG', coords: [-19.8125, -43.1736], population: 80187, businessPotential: 'Médio-Baixo' },
+{ name: 'Alfenas MG', coords: [-21.4300, -45.9472], population: 78970, businessPotential: 'Médio-Baixo' },
+{ name: 'Viçosa MG', coords: [-20.7542, -42.8747], population: 76430, businessPotential: 'Médio-Baixo' },
+{ name: 'Três Corações MG', coords: [-21.6977, -45.2515], population: 75485, businessPotential: 'Médio-Baixo' },
+{ name: 'Lagoa Santa MG', coords: [-19.6396, -43.8932], population: 75145, businessPotential: 'Médio-Baixo' },
+{ name: 'Ouro Preto MG', coords: [-20.3856, -43.5037], population: 74824, businessPotential: 'Médio-Baixo' },
+{ name: 'São Sebastião do Paraíso MG', coords: [-20.9167, -46.9839], population: 71796, businessPotential: 'Médio-Baixo' },
+{ name: 'Janaúba MG', coords: [-15.8005, -43.3134], population: 70699, businessPotential: 'Médio-Baixo' },
+{ name: 'Formiga MG', coords: [-20.4607, -45.4269], population: 68248, businessPotential: 'Médio-Baixo' },
+{ name: 'Cataguases MG', coords: [-21.3916, -42.6895], population: 66261, businessPotential: 'Médio-Baixo' },
+
+{ name: 'Januária MG', coords: [-15.4790, -44.3662], population: 65130, businessPotential: 'Médio-Baixo' },
+{ name: 'Pedro Leopoldo MG', coords: [-19.6310, -44.0380], population: 62580, businessPotential: 'Médio-Baixo' },
+{ name: 'Mariana MG', coords: [-20.3796, -43.4149], population: 61387, businessPotential: 'Médio-Baixo' },
+{ name: 'Frutal MG', coords: [-20.0253, -48.9324], population: 58588, businessPotential: 'Médio-Baixo' },
+{ name: 'Ponte Nova MG', coords: [-20.4115, -42.8976], population: 57776, businessPotential: 'Médio-Baixo' },
+{ name: 'Pirapora MG', coords: [-17.3392, -44.9332], population: 55606, businessPotential: 'Médio-Baixo' },
+{ name: 'Três Pontas MG', coords: [-21.3695, -45.5109], population: 55259, businessPotential: 'Médio-Baixo' },
+{ name: 'Extrema MG', coords: [-22.8514, -46.3172], population: 53482, businessPotential: 'Médio-Baixo' },
+{ name: 'Itabirito MG', coords: [-20.2536, -43.8032], population: 53282, businessPotential: 'Médio-Baixo' },
+{ name: 'Congonhas MG', coords: [-20.4953, -43.8584], population: 52890, businessPotential: 'Médio-Baixo' },
+{ name: 'São Francisco MG', coords: [-15.9526, -44.8592], population: 52762, businessPotential: 'Médio-Baixo' },
+
+{ name: 'Campo Belo MG', coords: [-20.8979, -45.2706], population: 52277, businessPotential: 'Médio-Baixo' },
+{ name: 'Bom Despacho MG', coords: [-19.7356, -45.2629], population: 51737, businessPotential: 'Médio-Baixo' },
+{ name: 'Lagoa da Prata MG', coords: [-20.0236, -45.5407], population: 51412, businessPotential: 'Médio-Baixo' },
+{ name: 'Leopoldina MG', coords: [-21.5282, -42.6423], population: 51145, businessPotential: 'Médio-Baixo' },
+{ name: 'Guaxupé MG', coords: [-21.3059, -46.7100], population: 50911, businessPotential: 'Médio-Baixo' },
+
+{ name: 'Bocaiuva MG', coords: [-17.1125, -43.8117], population: 48032, businessPotential: 'Baixo' },
+{ name: 'Diamantina MG', coords: [-18.2439, -43.6005], population: 47702, businessPotential: 'Baixo' },
+{ name: 'Monte Carmelo MG', coords: [-18.7308, -47.4919], population: 47689, businessPotential: 'Baixo' },
+{ name: 'João Pinheiro MG', coords: [-17.7360, -46.1713], population: 46801, businessPotential: 'Baixo' },
+{ name: 'Igarapé MG', coords: [-20.0706, -44.3065], population: 45847, businessPotential: 'Baixo' },
+{ name: 'Santana do Paraíso MG', coords: [-19.3667, -42.5402], population: 44800, businessPotential: 'Baixo' },
+{ name: 'São Lourenço MG', coords: [-22.1167, -45.0500], population: 44798, businessPotential: 'Baixo' },
+{ name: 'Santos Dumont MG', coords: [-21.4631, -43.5528], population: 42406, businessPotential: 'Baixo' },
+{ name: 'Arcos MG', coords: [-20.2822, -45.5259], population: 41417, businessPotential: 'Baixo' },
+{ name: 'São Gotardo MG', coords: [-19.3150, -46.0461], population: 40910, businessPotential: 'Baixo' },
+{ name: 'Santa Rita do Sapucaí MG', coords: [-22.2463, -45.7045], population: 40635, businessPotential: 'Baixo' },
+
+
+{ name: 'Andradas MG', coords: [-22.0700, -46.5695], population: 40548, businessPotential: 'Baixo' },
+{ name: 'Almenara MG', coords: [-16.1814, -40.6941], population: 40364, businessPotential: 'Baixo' },
+{ name: 'Salinas MG', coords: [-16.1753, -42.2964], population: 40178, businessPotential: 'Baixo' },
+{ name: 'Boa Esperança MG', coords: [-21.0900, -45.5611], population: 39848, businessPotential: 'Baixo' },
+{ name: 'Capelinha MG', coords: [-17.6881, -42.5140], population: 39624, businessPotential: 'Baixo' },
+{ name: 'Oliveira MG', coords: [-20.6980, -44.8258], population: 39262, businessPotential: 'Baixo' },
+{ name: 'Visconde do Rio Branco MG', coords: [-21.0123, -42.8372], population: 39160, businessPotential: 'Baixo' },
+{ name: 'Brumadinho MG', coords: [-20.1507, -44.1996], population: 38915, businessPotential: 'Baixo' },
+{ name: 'Caeté MG', coords: [-19.8911, -43.6714], population: 38776, businessPotential: 'Baixo' },
+{ name: 'Ouro Branco MG', coords: [-20.5242, -43.6967], population: 38724, businessPotential: 'Baixo' },
+{ name: 'Iturama MG', coords: [-19.7263, -50.1962], population: 38295, businessPotential: 'Baixo' },
+
+{ name: 'Mateus Leme MG', coords: [-19.9799, -44.4272], population: 37841, businessPotential: 'Baixo' },
+{ name: 'Machado MG', coords: [-21.6777, -45.9186], population: 37684, businessPotential: 'Baixo' },
+{ name: 'Jaíba MG', coords: [-15.3433, -43.6799], population: 37660, businessPotential: 'Baixo' },
+{ name: 'Matozinhos MG', coords: [-19.5541, -44.0851], population: 37618, businessPotential: 'Baixo' },
+{ name: 'Porteirinha MG', coords: [-15.7407, -43.0281], population: 37438, businessPotential: 'Baixo' },
+{ name: 'Sarzedo MG', coords: [-20.0369, -44.1443], population: 36844, businessPotential: 'Baixo' },
+{ name: 'Piumhi MG', coords: [-20.4776, -45.9583], population: 36062, businessPotential: 'Baixo' },
+{ name: 'Nanuque MG', coords: [-17.8380, -40.3535], population: 35038, businessPotential: 'Baixo' },
+{ name: 'São Joaquim de Bicas MG', coords: [-20.0483, -44.2720], population: 34348, businessPotential: 'Baixo' },
+{ name: 'Araçuaí MG', coords: [-16.8520, -42.0639], population: 34297, businessPotential: 'Baixo' },
+{ name: 'Várzea da Palma MG', coords: [-17.5942, -44.7225], population: 33744, businessPotential: 'Baixo' },
+{ name: 'Taiobeiras MG', coords: [-15.8082, -42.2306], population: 33050, businessPotential: 'Baixo' },
+
+
+
+    // Adicione mais cidades conforme necessário
+
+        ];
+
+        let listaDeCidades = [];
+        let marcadores = [];
+
+        function carregarCidades() {
+    const estadoSelect = document.getElementById('estado-select');
+    const estadoEscolhido = estadoSelect.value;
+
+    if (estadoEscolhido) {
+        listaDeCidades = citiesData.filter(cidade => cidade.name.endsWith(` ${estadoEscolhido}`));
+    } else {
+        listaDeCidades = citiesData;
+    }
+
+    atualizarMarcadores();
+    atualizarListaCidades();
+}
+
+
+function filtrarCidades() {
+    const filtroPotencial = document.getElementById('filtro-potencial').value;
+    const estadoEscolhido = document.getElementById('estado-select').value;
+
+    let filtroEstado = cidade => true; // Por padrão, todas as cidades são selecionadas
+
+    if (estadoEscolhido) { // Se um estado foi escolhido
+        filtroEstado = cidade => cidade.name.endsWith(estadoEscolhido);
+    }
+
+    let filtroComercial = cidade => true; // Por padrão, todas as cidades são selecionadas
+
+    if (filtroPotencial !== 'todos') {
+        if (filtroPotencial === 'baixo') {
+            filtroComercial = cidade => cidade.population < 50000;
+        } else if (filtroPotencial === 'medio-baixo') {
+            filtroComercial = cidade => cidade.population >= 50000 && cidade.population < 100000;
+        } else if (filtroPotencial === 'medio') {
+            filtroComercial = cidade => cidade.population >= 100000 && cidade.population < 150000;
+        } else if (filtroPotencial === 'medio-alto') {
+            filtroComercial = cidade => cidade.population >= 150000 && cidade.population < 200000;
+        } else if (filtroPotencial === 'alto') {
+            filtroComercial = cidade => cidade.population >= 200000;
+        }
+    }
+
+    listaDeCidades = citiesData.filter(cidade => filtroEstado(cidade) && filtroComercial(cidade));
+
+    atualizarMarcadores();
+    atualizarListaCidades();
+}
+
+
+
+
+function atualizarMarcadores() {
+    limparMarcadores();
+
+    listaDeCidades.forEach(cidade => {
+        let color;
+        if (cidade.population < 50000) {
+            color = '#f00'; // Baixo
+        } else if (cidade.population >= 50000 && cidade.population < 100000) {
+            color = '#ffa500'; // Médio-Baixo
+        } else if (cidade.population >= 100000 && cidade.population < 150000) {
+            color = '#ffd700'; // Médio
+        } else if (cidade.population >= 150000 && cidade.population < 200000) {
+            color = '#adff2f'; // Médio-Alto
+        } else if (cidade.population >= 200000 && cidade.population < 1000000) {
+            color = '#0CFBE4'; // Alto-Baixo
+        } else if (cidade.population >= 1000000) {
+            color = '#5BA803'; // Alto
+        }
+
+        const marker = L.marker(cidade.coords, { icon: getMarkerIcon(color), draggable: true }).addTo(map)
+            .bindPopup(`${cidade.name}<br>População: ${cidade.population}<br>Potencial Comercial: ${cidade.businessPotential}`)
+            .openPopup();
+        marcadores.push(marker);
+    });
+}
+
+
+
+
+
+        function getMarkerIcon(color) {
+            const iconHtml = `<div style="background-color: ${color}; border-radius: 50%; width: 20px; height: 20px;"></div>`;
+            return L.divIcon({ className: 'custom-div-icon', html: iconHtml });
+        }
+
+        let adicionarMarcadorAtivado = false;
+
+        function adicionarMarcador() {
+            adicionarMarcadorAtivado = !adicionarMarcadorAtivado;
+            const adicionarMarcadorBtn = document.getElementById('adicionar-marcador-btn');
+            if (adicionarMarcadorAtivado) {
+                adicionarMarcadorBtn.classList.add('destacado');
+                map.on('dblclick', adicionarMarcadorNoMapa);
+            } else {
+                adicionarMarcadorBtn.classList.remove('destacado');
+                map.off('dblclick', adicionarMarcadorNoMapa);
+            }
+        }
+
+        function adicionarMarcadorNoMapa(event) {
+            if (isCtrlKeyPressed(event)) {
+                return;
+            }
+
+            const latLng = event.latlng;
+            const marker = L.marker(latLng, { icon: getMarkerIcon('#00f'), draggable: true }).addTo(map)
+                .bindPopup(`Lat: ${latLng.lat}, Lng: ${latLng.lng}`)
+                .openPopup();
+            marcadores.push(marker);
+        }
+
+        function isCtrlKeyPressed(event) {
+            const ctrlKey = event.originalEvent && event.originalEvent.ctrlKey;
+            return ctrlKey || event.ctrlKey;
+        }
+
+        function limparMarcadores() {
+            marcadores.forEach(marker => {
+                map.removeLayer(marker);
+            });
+            marcadores = [];
+        }
+
+        function filtrarOpcoes() {
+            const buscaInput = document.getElementById('busca-input');
+            const filtro = buscaInput.value.toLowerCase();
+
+            listaDeCidades = citiesData.filter(cidade => cidade.name.toLowerCase().includes(filtro));
+
+            atualizarMarcadores();
+            atualizarListaCidades();
+        }
+
+        function atualizarListaCidades() {
+            const filtroCidadeSelect = document.getElementById('filtro-cidade');
+            filtroCidadeSelect.innerHTML = '<option value="todos">Todas</option>';
+            listaDeCidades.forEach(cidade => {
+                filtroCidadeSelect.innerHTML += `<option value="${cidade.name}">${cidade.name}</option>`;
+            });
+        }
+
+        function filtrarCidadesPorNome() {
+    const filtroCidadeSelect = document.getElementById('filtro-cidade');
+    const cidadeEscolhida = filtroCidadeSelect.value;
+    if (cidadeEscolhida === 'todos') {
+        listaDeCidades = citiesData;
+    } else {
+        listaDeCidades = citiesData.filter(cidade => cidade.name === cidadeEscolhida);
+    }
+
+    atualizarMarcadores();
+}
+
+
+        function salvarMapa() {
+            const marcadoresSalvos = [];
+            marcadores.forEach(marker => {
+                marcadoresSalvos.push({
+                    lat: marker.getLatLng().lat,
+                    lng: marker.getLatLng().lng,
+                    color: marker.options.icon.options.html.includes('#00f') ? '#00f' : '#f00'
+                });
+            });
+
+            const mapaSalvo = {
+                estado: document.getElementById('estado-select').value,
+                filtroPotencial: document.getElementById('filtro-potencial').value,
+                filtroCidade: document.getElementById('filtro-cidade').value,
+                marcadores: marcadoresSalvos
+            };
+
+            const jsonMapaSalvo = JSON.stringify(mapaSalvo);
+
+            // Aqui você pode salvar o jsonMapaSalvo no banco de dados ou onde desejar.
+            console.log(jsonMapaSalvo);
+        }
+
+        function carregarMapa() {
+            const jsonMapaSalvo = '{"estado":"MG","filtroPotencial":"todos","filtroCidade":"todos","marcadores":[{"lat":-19.1551,"lng":-45.4444,"color":"#008000"},{"lat":-21.4256,"lng":-45.9477,"color":"#008000"},{"lat":-18.6469,"lng":-48.193,"color":"#008000"},{"lat":-19.5902,"lng":-46.9438,"color":"#008000"},{"lat":-20.2863,"lng":-45.5373,"color":"#ffa500"},{"lat":-21.957,"lng":-44.8874,"color":"#ffd700"},{"lat":-19.7481,"lng":-44.4369,"color":"#008000"}]}';
+
+            const mapaSalvo = JSON.parse(jsonMapaSalvo);
+            document.getElementById('estado-select').value = mapaSalvo.estado;
+            document.getElementById('filtro-potencial').value = mapaSalvo.filtroPotencial;
+            document.getElementById('filtro-cidade').value = mapaSalvo.filtroCidade;
+
+            limparMarcadores();
+            mapaSalvo.marcadores.forEach(marcador => {
+                const color = marcador.color;
+                const marker = L.marker([marcador.lat, marcador.lng], { icon: getMarkerIcon(color), draggable: true }).addTo(map)
+                    .bindPopup(`Lat: ${marcador.lat}, Lng: ${marcador.lng}`)
+                    .openPopup();
+                marcadores.push(marker);
+            });
+
+            listaDeCidades = citiesData.filter(cidade => cidade.name === mapaSalvo.filtroCidade);
+        }
+
+        carregarCidades();
+
+
+         // Adicionar funcionalidade "draggable" usando JavaScript
+
+
+
+    // Adicionar funcionalidade "draggable" usando JavaScript
+var overlay = document.getElementById('overlay');
+var isDragging = true;
+var offsetX = 0;
+var offsetY = 0;
+
+overlay.addEventListener('mousedown', function (e) {
+  isDragging = true;
+  offsetX = e.clientX - overlay.getBoundingClientRect().left;
+  offsetY = e.clientY - overlay.getBoundingClientRect().top;
+  overlay.style.cursor = 'grabbing'; // Muda o cursor durante o arraste
+});
+
+document.addEventListener('mousemove', function (e) {
+  if (!isDragging) return;
+
+  var x = e.clientX - offsetX;
+  var y = e.clientY - offsetY;
+
+  overlay.style.left = x + 'px';
+  overlay.style.top = y + 'px';
+});
+
+document.addEventListener('mouseup', function () {
+  isDragging = false;
+  overlay.style.cursor = 'grab'; // Retorna ao cursor de mão fechada
+});
+
+
+    </script>
+</body>
+</html>
